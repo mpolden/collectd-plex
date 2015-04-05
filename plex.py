@@ -102,7 +102,7 @@ def sum_videos(data, sum_leaf=False):
 
 
 def main():
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 6:
         print('{} <host> <port> <section> <sum_leaf> <instance>'.format(
             sys.argv[0]))
         sys.exit(1)
