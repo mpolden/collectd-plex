@@ -118,7 +118,9 @@ def main():
         print({
             'value': value,
             'type_instance': type_instance,
-            'plugin_instance': plugin_instance
+            'plugin_instance': plugin_instance,
+            'full_name': 'plex-{}.gauge-{}.value'.format(plugin_instance,
+                                                         type_instance)
         })
     get_metrics(conf, callback)
 
