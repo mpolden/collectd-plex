@@ -3,7 +3,6 @@
 from __future__ import print_function
 
 import sys
-import collectd
 import requests
 
 CONFIGS = []
@@ -120,5 +119,6 @@ def main():
 if __name__ == '__main__':
     main()
 else:
+    import collectd
     collectd.register_config(configure_callback)
     collectd.register_read(read_callback)
