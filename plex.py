@@ -51,7 +51,16 @@ def read_callback():
         get_metrics(conf)
 
 
-def get_metrics(conf, dryrun=False):
+def dispatch_value(type_instance, plugin_instance, value):
+    val = collectd.Values(plugin='plex')
+    val.type = 'gauge'
+    val.type_instance = type_instance
+    val.plugin_instance = plugin_instance
+    val.values = [value]
+    val.dispatch()
+
+
+def get_metrics(conf, callback=None):
     url = 'http://{host}:{port}/library/sections/{section}/all'.format(
         host=conf['host'],
         port=conf['port'],
@@ -62,18 +71,10 @@ def get_metrics(conf, dryrun=False):
     plugin_instance = get_plugin_instance(conf)
     type_instance = get_type_instance(data, conf)
 
-    if dryrun:
-        return {
-            'count': count,
-            'type_instance': type_instance,
-            'plugin_instance': plugin_instance
-        }
-    val = collectd.Values(plugin='plex')
-    val.type = 'gauge'
-    val.type_instance = type_instance
-    val.plugin_instance = plugin_instance
-    val.values = [count]
-    val.dispatch()
+    if callback is None:
+        dispatch_value(type_instance, plugin_instance, count)
+    else:
+        callback(type_instance, plugin_instance, count)
 
 
 def get_plugin_instance(conf):
@@ -113,7 +114,14 @@ def main():
         'sum_leaf': sys.argv[4].lower() == 'true',
         'instance': instance
     }
-    print(get_metrics(conf, True))
+
+    def callback(type_instance, plugin_instance, value):
+        print({
+            'value': value,
+            'type_instance': type_instance,
+            'plugin_instance': plugin_instance
+        })
+    get_metrics(conf, callback)
 
 
 if __name__ == '__main__':
