@@ -9,7 +9,6 @@ CONFIGS = []
 
 
 def configure_callback(conf):
-    """Receive configuration block"""
     host = None
     port = None
     section = None
@@ -42,7 +41,7 @@ def configure_callback(conf):
         'instance': instance
     }
 
-    collectd.info('Configured with {}'.format(config))
+    collectd.info('plex plugin: Configured with {}'.format(config))
     CONFIGS.append(config)
 
 
