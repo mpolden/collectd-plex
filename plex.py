@@ -14,6 +14,7 @@ def configure_callback(conf):
     section = None
     sum_leaf = False
     instance = None
+    authtoken = None
 
     for node in conf.children:
         key = node.key.lower()
@@ -29,6 +30,8 @@ def configure_callback(conf):
             sum_leaf = val
         elif key == 'instance':
             instance = val
+        elif key == 'authtoken':
+            authtoken = val
         else:
             collectd.warning('plex plugin: Unknown config key: %s.' % key)
             continue
@@ -38,7 +41,8 @@ def configure_callback(conf):
         'port': port,
         'section': section,
         'sum_leaf': sum_leaf,
-        'instance': instance
+        'instance': instance,
+        'authtoken': authtoken
     }
 
     collectd.info('plex plugin: Configured with {}'.format(config))
@@ -65,7 +69,7 @@ def get_metrics(conf, callback=None):
         port=conf['port'],
         section=conf['section']
     )
-    data = get_json(url)
+    data = get_json(url, conf['authtoken'])
     count = sum_videos(data, conf['sum_leaf'])
     plugin_instance = get_plugin_instance(conf)
     type_instance = get_type_instance(data, conf)
@@ -88,8 +92,11 @@ def get_type_instance(data, conf):
     return instance
 
 
-def get_json(url):
-    headers = {'Accept': 'application/json'}
+def get_json(url, authtoken):
+    headers = {
+               'Accept': 'application/json',
+               'X-Plex-Token': authtoken
+              }
     r = requests.get(url, headers=headers)
     return r.json()
 
@@ -101,16 +108,17 @@ def sum_videos(data, sum_leaf=False):
 
 
 def main():
-    if len(sys.argv) < 6:
-        print('{} <host> <port> <section> <sum_leaf> <instance>'.format(
+    if len(sys.argv) < 7:
+        print('{} <host> <port> <authtoken> <section> <sum_leaf> <instance>'.format(
             sys.argv[0]))
         sys.exit(1)
-    instance = sys.argv[5] if sys.argv[5] != 'auto' else None
+    instance = sys.argv[6] if sys.argv[6] != 'auto' else None
     conf = {
         'host': sys.argv[1],
         'port': sys.argv[2],
-        'section': sys.argv[3],
-        'sum_leaf': sys.argv[4].lower() == 'true',
+        'authtoken': sys.argv[3],
+        'section': sys.argv[4],
+        'sum_leaf': sys.argv[5].lower() == 'true',
         'instance': instance
     }
 
