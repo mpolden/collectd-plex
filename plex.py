@@ -73,6 +73,8 @@ def get_metrics(conf, callback=None):
             print('Must provide section number to find media count!')
             sys.exit(1)
         (value, data) = get_media_count(conf)
+    elif conf['metric'] in ['sessions']:
+        (value, data) = get_sessions(conf) 
     else:
         print('Unknown metric type: {0}'.format(conf['metric']))
         sys.exit(1)
@@ -118,6 +120,20 @@ def validate_media_type(section, title, metric, media):
     else:
         return True
 
+
+def get_sessions(conf):
+
+    url = 'http://{host}:{port}/status/sessions'.format(
+        host=conf['host'],
+        port=conf['port'],
+        section=conf['section']
+    )
+
+    data = get_json(url, conf['authtoken'])
+    count = sum_sessions(data)
+
+    return (count, data)
+
 def get_plugin_instance(conf):
     return '{host}-section_{section}'.format(host=conf['host'],
                                              section=conf['section'])
@@ -142,6 +158,9 @@ def get_json(url, authtoken):
 def sum_videos(data, sum_leaf=False):
     if sum_leaf:
         return sum(c['leafCount'] for c in data['_children'])
+    return len(data['_children'])
+
+def sum_sessions(data):
     return len(data['_children'])
 
 

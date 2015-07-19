@@ -17,6 +17,7 @@ A Plex plugin for [collectd](https://collectd.org/).
   * `movies` - number of movies
   * `shows` - number of shows
   * `episodes` - number of episodes
+  * `sessions` - number of active sessions/streams
 * **Optional:** `Section` - Plex library section to query (must match metric type)
 * `Instance` - CollectD type instance
 
