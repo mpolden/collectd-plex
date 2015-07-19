@@ -11,8 +11,8 @@ CONFIGS = []
 def configure_callback(conf):
     host = None
     port = None
+    metric = None
     section = None
-    sum_leaf = False
     instance = None
     authtoken = None
 
@@ -24,10 +24,13 @@ def configure_callback(conf):
             host = val
         elif key == 'port':
             port = int(val)
-        elif key == 'section':
-            section = int(val)
-        elif key == 'sumleaf':
-            sum_leaf = val
+        elif key == 'metric':
+          metric_parts = val.split(':')
+          if len(metric_parts) > 2:
+              collectd.error('Invalid metric format: {0}'.format(sys.argv[4]))
+          elif len(metric_parts) > 1:
+              section = metric_parts[1]
+          metric = metric_parts[0]
         elif key == 'instance':
             instance = val
         elif key == 'authtoken':
@@ -39,8 +42,8 @@ def configure_callback(conf):
     config = {
         'host': host,
         'port': port,
+        'metric': metric,
         'section': section,
-        'sum_leaf': sum_leaf,
         'instance': instance,
         'authtoken': authtoken
     }
@@ -64,21 +67,56 @@ def dispatch_value(type_instance, plugin_instance, value):
 
 
 def get_metrics(conf, callback=None):
+
+    if conf['metric'] in ['movies', 'shows', 'episodes']:
+        if conf['section'] is None:
+            print('Must provide section number to find media count!')
+            sys.exit(1)
+        (value, data) = get_media_count(conf)
+    else:
+        print('Unknown metric type: {0}'.format(conf['metric']))
+        sys.exit(1)
+
+    plugin_instance = get_plugin_instance(conf)
+    type_instance = get_type_instance(data, conf)
+
+    if callback is None:
+        dispatch_value(type_instance, plugin_instance, value)
+    else:
+        callback(type_instance, plugin_instance, value)
+
+def get_media_count(conf):
+
     url = 'http://{host}:{port}/library/sections/{section}/all'.format(
         host=conf['host'],
         port=conf['port'],
         section=conf['section']
     )
+
     data = get_json(url, conf['authtoken'])
-    count = sum_videos(data, conf['sum_leaf'])
-    plugin_instance = get_plugin_instance(conf)
-    type_instance = get_type_instance(data, conf)
+    validate_media_type(conf['section'], data['librarySectionTitle'], conf['metric'], data['viewGroup'])
 
-    if callback is None:
-        dispatch_value(type_instance, plugin_instance, count)
+    if conf['metric'] in ['movies', 'shows']:
+    	count = sum_videos(data, False)
+    elif conf['metric'] in ['episodes']:
+        count = sum_videos(data, True)
+
+    return (count, data)
+
+def validate_media_type(section, title, metric, media):
+
+    mapping = {'movies': 'movie',
+               'shows': 'show',
+               'episodes': 'show'}
+
+    if mapping[metric] != media:
+        print('Section #{0} ({1}) contains {2}s. Does not match metric, {3}!'.format(section,
+                                                                                     title,
+                                                                                     media,
+                                                                                     metric))
+        sys.exit(1)
     else:
-        callback(type_instance, plugin_instance, count)
-
+        return True
 
 def get_plugin_instance(conf):
     return '{host}-section_{section}'.format(host=conf['host'],
@@ -108,19 +146,31 @@ def sum_videos(data, sum_leaf=False):
 
 
 def main():
-    if len(sys.argv) < 7:
-        print('{} <host> <port> <authtoken> <section> <sum_leaf> <instance>'.format(
+    if len(sys.argv) < 6:
+        print('{} <host> <port> <authtoken> <metric> <instance>'.format(
             sys.argv[0]))
+        print('Metrics:')
+        print ('- movies:<Section#>')
+        print ('- shows:<Section#>')
+        print ('- episodes:<Section#>')
+        print ('- sessions')
         sys.exit(1)
-    instance = sys.argv[6] if sys.argv[6] != 'auto' else None
+    instance = sys.argv[5] if sys.argv[5] != 'auto' else None
     conf = {
         'host': sys.argv[1],
         'port': sys.argv[2],
         'authtoken': sys.argv[3],
-        'section': sys.argv[4],
-        'sum_leaf': sys.argv[5].lower() == 'true',
         'instance': instance
     }
+    metric_parts = sys.argv[4].split(':')
+    if len(metric_parts) > 2:
+        print('Invalid metric format: {0}'.format(sys.argv[4]))
+        sys.exit(1)
+    if len(metric_parts) > 1:
+        conf['section'] = metric_parts[1]
+    else:
+        conf['section'] = None
+    conf['metric'] = metric_parts[0]
 
     def callback(type_instance, plugin_instance, value):
         print({
