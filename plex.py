@@ -25,30 +25,24 @@ def configure_callback(conf):
         elif key == 'port':
             port = int(val)
         elif key == 'metric':
-          metric_parts = val.split(':')
-          if len(metric_parts) > 2:
-              collectd.error('Invalid metric format: {0}'.format(sys.argv[4]))
-          elif len(metric_parts) > 1:
-              section = metric_parts[1]
-          metric = metric_parts[0]
-        elif key == 'instance':
-            instance = val
+            metric = val
+        elif key == 'section':
+            section = str(int(val))
         elif key == 'authtoken':
             authtoken = val
         else:
-            collectd.warning('plex plugin: Unknown config key: %s.' % key)
+            warnmessage(' Unknown config key: %s.' % key)
             continue
 
     config = {
         'host': host,
         'port': port,
+        'authtoken': authtoken,
         'metric': metric,
-        'section': section,
-        'instance': instance,
-        'authtoken': authtoken
+        'section': section
     }
 
-    collectd.info('plex plugin: Configured with {}'.format(config))
+    infomessage('Configured with {}'.format(config))
     CONFIGS.append(config)
 
 
@@ -70,14 +64,12 @@ def get_metrics(conf, callback=None):
 
     if conf['metric'] in ['movies', 'shows', 'episodes']:
         if conf['section'] is None:
-            print('Must provide section number to find media count!')
-            sys.exit(1)
+            errormessage('Must provide section number to find media count!')
         (value, data) = get_media_count(conf)
     elif conf['metric'] in ['sessions']:
         (value, data) = get_sessions(conf) 
     else:
-        print('Unknown metric type: {0}'.format(conf['metric']))
-        sys.exit(1)
+        errormessage('Unknown metric type: {0}'.format(conf['metric']))
 
     plugin_instance = get_plugin_instance(conf)
     type_instance = get_type_instance(data, conf)
@@ -89,11 +81,9 @@ def get_metrics(conf, callback=None):
 
 def get_media_count(conf):
 
-    url = 'http://{host}:{port}/library/sections/{section}/all'.format(
-        host=conf['host'],
-        port=conf['port'],
-        section=conf['section']
-    )
+    url = 'http://{host}:{port}/library/sections/{section}/all'.format(host=conf['host'],
+                                                                       port=conf['port'],
+                                                                       section=conf['section'])
 
     data = get_json(url, conf['authtoken'])
     validate_media_type(conf['section'], data['librarySectionTitle'], conf['metric'], data['viewGroup'])
@@ -112,10 +102,10 @@ def validate_media_type(section, title, metric, media):
                'episodes': 'show'}
 
     if mapping[metric] != media:
-        print('Section #{0} ({1}) contains {2}s. Does not match metric, {3}!'.format(section,
-                                                                                     title,
-                                                                                     media,
-                                                                                     metric))
+        errormessage('Section #{0} ({1}) contains {2}s. Does not match metric, {3}!'.format(section,
+                                                                                            title,
+                                                                                            media,
+                                                                                            metric))
         sys.exit(1)
     else:
         return True
@@ -135,15 +125,18 @@ def get_sessions(conf):
     return (count, data)
 
 def get_plugin_instance(conf):
-    return '{host}-section_{section}'.format(host=conf['host'],
-                                             section=conf['section'])
+    return '{host}'.format(host=conf['host'])
 
 
 def get_type_instance(data, conf):
-    instance = conf['instance']
-    if instance is None:
-        instance = data['title1'].lower().replace(' ', '_')
-    return instance
+
+    if conf['metric'] == 'sessions':
+        return 'sessions'
+    elif conf['metric'] in ['movies', 'shows', 'episodes']:
+        if conf['section'] is None:
+            return conf['metric']+'-all'
+        else:
+            return conf['metric']+'-'+conf['section']
 
 
 def get_json(url, authtoken):
@@ -165,46 +158,53 @@ def sum_sessions(data):
 
 
 def main():
-    if len(sys.argv) < 6:
-        print('{} <host> <port> <authtoken> <metric> <instance>'.format(
-            sys.argv[0]))
-        print('Metrics:')
-        print ('- movies:<Section#>')
-        print ('- shows:<Section#>')
-        print ('- episodes:<Section#>')
-        print ('- sessions')
-        sys.exit(1)
-    instance = sys.argv[5] if sys.argv[5] != 'auto' else None
+    if (len(sys.argv) < 5) or (len(sys.argv) > 6):
+        infomessage('{} <host> <port> <authtoken> <metric> [<section>]'.format(sys.argv[0]))
+        infomessage('Metrics:')
+        infomessage('- movies')
+        infomessage('- shows')
+        infomessage('- episodes')
+        errormessage('- sessions')
+    section = sys.argv[5] if len(sys.argv) == 6 else None
     conf = {
         'host': sys.argv[1],
         'port': sys.argv[2],
         'authtoken': sys.argv[3],
-        'instance': instance
+        'metric': sys.argv[4],
+        'section': section
     }
-    metric_parts = sys.argv[4].split(':')
-    if len(metric_parts) > 2:
-        print('Invalid metric format: {0}'.format(sys.argv[4]))
-        sys.exit(1)
-    if len(metric_parts) > 1:
-        conf['section'] = metric_parts[1]
-    else:
-        conf['section'] = None
-    conf['metric'] = metric_parts[0]
 
     def callback(type_instance, plugin_instance, value):
         print({
             'value': value,
             'type_instance': type_instance,
             'plugin_instance': plugin_instance,
-            'full_name': 'plex-{}.gauge-{}.value'.format(plugin_instance,
-                                                         type_instance)
+            'full_name': 'plex-{}.{}.value'.format(plugin_instance,
+                                                   type_instance)
         })
     get_metrics(conf, callback)
 
 
 if __name__ == '__main__':
+
+    def infomessage(message):
+        print(message)
+    def warnmessage(message):
+        print(message)
+    def errormessage(message):
+        print(message)
+        sys.exit(1)
     main()
 else:
     import collectd
+
+    def infomessage(message):
+        collectd.info('plex plugin: ' + message)
+    def warnmessage(message):
+         collectd.warning('plex plugin: ' + message)
+    def errormessage(message): 
+        collectd.error('plex plugin: ' + message)
+        sys.exit(1)
+
     collectd.register_config(configure_callback)
     collectd.register_read(read_callback)
