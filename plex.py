@@ -125,7 +125,7 @@ def get_sessions(conf):
     return (count, data)
 
 def get_plugin_instance(conf):
-    return '{host}'.format(host=conf['host'])
+    return conf['host']
 
 
 def get_type_instance(data, conf):

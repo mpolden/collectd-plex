@@ -10,7 +10,7 @@ A Plex plugin for [collectd](https://collectd.org/).
 
 # Configuration
 
-* `Host` - Plex server hostname (also used to identify metric)
+* `Host` - Plex server hostname
 * `Port` - Plex server port
 * `AuthToken` - Plex.tv authentication token
 * `Metric` - Metric to collect.  Supported metrics:
@@ -19,7 +19,6 @@ A Plex plugin for [collectd](https://collectd.org/).
   * `episodes` - number of episodes
   * `sessions` - number of active sessions/streams
 * **Optional:** `Section` - Plex library section to query (must match metric type)
-* `Instance` - CollectD type instance
 
 ## Examples
 
@@ -39,7 +38,6 @@ A Plex plugin for [collectd](https://collectd.org/).
     AuthToken <token>
     Metric movies
     Section 1
-    Instance movie
   </Module>
 
   # Count all shows in a TV Show section
@@ -49,7 +47,6 @@ A Plex plugin for [collectd](https://collectd.org/).
     AuthToken <token>
     Metric shows
     Section 2
-    Instance tv_shows
   </Module>
 
   # Count all episodes in a TV Show section
@@ -59,7 +56,14 @@ A Plex plugin for [collectd](https://collectd.org/).
     AuthToken <token>
     Metric episodes
     Section 2
-    Instance episodes
+  </Module>
+
+  # Count all active sessions
+  <Module plex>
+    Host "localhost"
+    Port 32400
+    AuthToken <token>
+    Metric sessions
   </Module>
 
 </Plugin>
